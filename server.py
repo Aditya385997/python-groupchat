@@ -1,8 +1,20 @@
 import socket
 import threading
+import sqlite3
+import traceback
+import sys
+#create a database
+
+db = sqlite3.connect("chatroom.sqlite",check_same_thread=False)
+
+
+cursor = db.cursor()
+
+cursor.execute("CREATE TABLE IF NOT EXISTS client(name Text , chat Text)")
+
 
 host = '127.0.0.1'
-port = 59002
+port = 59008
 
 server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 
@@ -23,7 +35,22 @@ def handle_client(client):
         try:
             # the message recived from the client 
             message = client.recv(1024)
+            decode_message = message.decode("utf-8")
+            index = clients.index(client)
+            nick_name = nick_names[index]
             broadcast(message)
+            try:
+                sql_query = "INSERT INTO client VALUES(?,?)" 
+                sql_data = (nick_name,decode_message)
+                cursor.execute(sql_query,sql_data)
+                db.commit()
+            except sqlite3.Error as er:
+                print('SQLite error: %s' % (' '.join(er.args)))
+                print("Exception class is: ", er.__class__)
+                print('SQLite traceback: ')
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                print(traceback.format_exception(exc_type, exc_value, exc_tb))
+                db.rollback()
         except:
             #if message failed to recieve that client should be remove
             index = clients.index(client)
@@ -36,10 +63,12 @@ def handle_client(client):
     
 def receive():
     while True:
-        print('server is rrunning and listening....')
+        print('server is running and listening....')
         client , address = server.accept()
         print(f'connection is established with{str(address)}')
+        # server requesting client nick name from the client this works internaaly
         client.send('nick_name?'.encode('utf-8'))
+        # server recives the nick name from the client and stored in the variable
         nick_name = client.recv(1024)
         nick_names.append(nick_name)
         clients.append(client)
@@ -51,4 +80,5 @@ def receive():
 
 if __name__ == '__main__':
     receive()
+        
         
